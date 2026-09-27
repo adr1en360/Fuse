@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fuse: Agent Circuit Breaker & Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #05080e;
+      --surface: #0c121e;
+      --surface-border: #1b263b;
+      --accent: #74cfd8;
+      --accent-muted: rgba(116, 207, 216, 0.15);
+      --text: #fefefe;
+      --text-muted: #8b9bb4;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* 16:9 Presentation Canvas */
+    .deck-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+      padding: 32px 0;
+    }
+
+    .slide {
+      width: 1280px;
+      height: 720px;
+      background: var(--bg);
+      border: 1px solid var(--surface-border);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 64px 80px;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    /* Slide Header */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid var(--surface-border);
+      padding-bottom: 20px;
+    }
+
+    .slide-title {
+      font-size: 38px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .slide-number {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* Slide Content Area */
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      margin: 28px 0;
+    }
+
+    /* Slide Footer */
+    .slide-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--surface-border);
+      padding-top: 16px;
+    }
+
+    .slide-footer-brand {
+      font-family: var(--font-mono);
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* Layout Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: stretch;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 28px;
+      align-items: stretch;
+    }
+
+    /* Structural Blocks */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    .panel-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-desc {
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--text-muted);
+    }
+
+    .highlight-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--accent-muted);
+      color: var(--accent);
+      margin-bottom: 12px;
+      width: fit-content;
+    }
+
+    /* Title Slide Special Layout */
+    .title-layout {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 24px;
+    }
+
+    .title-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .title-logo-row img {
+      width: 68px;
+      height: 68px;
+    }
+
+    .title-logo-text {
+      font-size: 56px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+
+    .title-tagline {
+      font-size: 28px;
+      color: var(--accent);
+      font-weight: 500;
+      max-width: 800px;
+      line-height: 1.35;
+    }
+
+    .title-meta {
+      display: flex;
+      gap: 40px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--surface-border);
+      width: 100%;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .meta-label {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .meta-val {
+      font-size: 16px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    /* Comparison Table */
+    .table-custom {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .table-custom th {
+      text-align: left;
+      padding: 14px 18px;
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      border-bottom: 2px solid var(--surface-border);
+    }
+
+    .table-custom td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--surface-border);
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .table-custom tr:last-child td {
+      border-bottom: none;
+    }
+
+    .table-custom .winner {
+      color: var(--text);
+      background: rgba(116, 207, 216, 0.05);
+      font-weight: 500;
+    }
+
+    /* Metrics Readout */
+    .metric-num {
+      font-family: var(--font-mono);
+      font-size: 40px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .metric-label {
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .metric-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Print / PDF Styles */
+    @media print {
+      @page {
+        size: 1280px 720px;
+        margin: 0;
+      }
+      body {
+        background: #05080e !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .deck-container {
+        padding: 0;
+        gap: 0;
+      }
+      .slide {
+        border: none;
+        width: 1280px !important;
+        height: 720px !important;
+        page-break-after: always;
+        break-after: page;
+      }
+      .slide-controls {
+        display: none !important;
+      }
+    }
+
+    /* Floating navigation bar */
+    .slide-controls {
+      position: fixed;
+      bottom: 20px;
+      background: rgba(12, 18, 30, 0.85);
+      border: 1px solid var(--surface-border);
+      border-radius: 30px;
+      padding: 8px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      backdrop-filter: blur(10px);
+      z-index: 100;
+    }
+
+    .slide-btn {
+      background: none;
+      border: 1px solid var(--surface-border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+    }
+
+    .slide-btn:hover {
+      background: var(--surface-border);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="deck-container">
+
+    <!-- SLIDE 1: Title / Cover -->
+    <section class="slide" id="slide-1">
+      <div class="title-layout">
+        <div class="title-logo-row">
+          <img src="../frontend/public/logo.svg" alt="Fuse Logo">
+          <div class="title-logo-text">Fuse</div>
+        </div>
+        <div class="title-tagline">
+          Intelligent reverse proxy and circuit breaker for autonomous AI agents.
+        </div>
+        <p style="color: var(--text-muted); font-size: 16px; max-width: 720px; line-height: 1.6;">
+          Protects downstream APIs, databases, and budgets from retry storms, recursive tool loops, and cascading bans without interrupting legitimate parallel work.
+        </p>
+        <div class="title-meta">
+          <div class="meta-item">
+            <span class="meta-label">Team</span>
+            <span class="meta-val">Wandering</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Presenter</span>
+            <span class="meta-val">Adrien Oke</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Event</span>
+            <span class="meta-val">GOMYCODE x NVIDIA Hackathon 2026</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Target Awards</span>
+            <span class="meta-val">Thunders Engineering Excellence & NVIDIA Brev</span>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-brand">fuse // gateway</span>
+        <span>Slide 01 of 10</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: The Problem -->
+    <section class="slide" id="slide-2">
+      <div class="slide-header">
+        <h2 class="slide-title">Autonomous agents panic on tool failures</h2>
+        <span class="slide-number">02 / 10</span>
+      </div>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="panel">
+            <span class="highlight-pill">The Real World Risk</span>
+            <div class="panel-title">Costly loops and service suspensions</div>
+            <p class="panel-desc">
+              When an upstream API returns an error or tool output lacks expected schema fields, autonomous agents often enter frantic recovery loops. They hammer the same failing endpoint, run up cloud API bills in minutes, and risk permanent account bans on services like WhatsApp Business or Stripe.
+            </p>
+          </div>
+          <div class="panel">
+            <span class="highlight-pill">Why Existing Limiters Fail</span>
+            <div class="panel-title">Static counters lack agent context</div>
+            <p class="panel-desc">
+              Traditional API gateways count raw requests per minute. They cannot tell the difference between an agent reading 10 documents in parallel during a RAG fanout and an agent stuck in a death loop hitting the same tool 10 times with identical arguments.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-brand">fuse // problem</span>
+        <span>Problem and User Value</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: Value Proposition -->
+    <section class="slide" id="slide-3">
+      <div class="slide-header">
+        <h2 class="slide-title">The safety boundary for agent tool calls</h2>
+        <span class="slide-number">03 / 10</span>
+      </div>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="panel">
+            <span class="highlight-pill">Zero Code Changes</span>
+            <div class="panel-title">Drop-in HTTP proxy</div>
+            <p class="panel-desc">
+              Fuse sits between your agent runtime and the internet. Agents simply configure their outbound base URL through Fuse. No agent harness code or prompts need modification.
+            </p>
+          </div>
+          <div class="panel">
+            <span class="highlight-pill">Context-Aware Triage</span>
+            <div class="panel-title">Pattern classification</div>
+            <p class="panel-desc">
+              Evaluates request velocity, tool argument entropy, and downstream error codes to distinguish benign parallel fanout from stuck retry storms.
+            </p>
+          </div>
+          <div class="panel">
+            <span class="highlight-pill">Auditable Forensics</span>
+            <div class="panel-title">Tamper-evident log</div>
+            <p class="panel-desc">
+              Every decision, layer evaluation, and throttled request is appended to a cryptographic SHA-256 hash-chained ledger for operational compliance.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-brand">fuse // solution</span>
+        <span>Core Value Proposition</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: Architecture -->
+    <section class="slide" id="slide-4">
+      <div class="slide-header">
+        <h2 class="slide-title">Three-layer defense hierarchy</h2>
+        <span class="slide-number">04 / 10</span>
+      </div>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="panel" style="border-top: 3px solid var(--danger);">
+            <span class="highlight-pill" style="color: var(--danger); background: rgba(239, 68, 68, 0.15);">Layer 1: Deterministic</span>
+            <div class="panel-title">Inviolable Hard Ceiling</div>
+            <p class="panel-desc">
+              Pure sliding-window arithmetic. Enforces hard maximum calls per time window (< 1 ms latency). No model output can bypass this failsafe barrier.
+            </p>
+          </div>
+          <div class="panel" style="border-top: 3px solid var(--accent);">
+            <span class="highlight-pill">Layer 2: Fast Classifier</span>
+            <div class="panel-title">Jev System One</div>
+            <p class="panel-desc">
+              Sub-100ms typed classification. Analyzes request velocity and argument signatures to classify traffic into parallel work, retry storm, or loop bug.
+            </p>
+          </div>
+          <div class="panel" style="border-top: 3px solid #8b5cf6;">
+            <span class="highlight-pill" style="color: #8b5cf6; background: rgba(139, 92, 246, 0.15);">Layer 3: Diagnostic</span>
+            <div class="panel-title">Gemini 3.8 Flash</div>
+            <p class="panel-desc">
+              Invoked only when Jev triggers its escape hatch or reports low confidence. Inspects full session history to deliver root-cause analysis and remediation.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-brand">fuse // architecture</span>
+        <span>Defense in Depth</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: How It Operates -->
+    <section class="slide" id="slide-5">
+      <div class="slide-header">
+        <h2 class="slide-title">Four live operational scenarios</h2>
+        <span class="slide-number">05 / 10</span>
+      </div>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-title" style="color: var(--success);">Act 1: Parallel Work Burst</div>
+            <p class="panel-desc">
+              Agent issues 10 simultaneous searches across distinct documents. Jev recognizes legitimate parallel intent with 0.88 confidence and forwards all calls without throttling.
+            </p>
+          </div>
+          <div class="panel">
+            <div class="panel-title" style="color: var(--warning);">Act 2: Stuck Retry Storm</div>
+            <p class="panel-desc">
+              Agent repeatedly hammers an HTTP 503 endpoint with identical arguments. Fuse detects a retry storm, injects exponential backoff, and saves the downstream API.
+            </p>
+          </div>
+          <div class="panel">
+            <div class="panel-title" style="color: var(--accent);">Act 3: Cyclic Loop Escape</div>
+            <p class="panel-desc">
+              Agent alternates between two tools without making progress. Jev triggers its escape hatch to Gemini 3.8 Flash, which diagnoses circular recursion and recommends tool isolation.
+            </p>
+          </div>
+          <div class="panel">
+            <div class="panel-title" style="color: var(--danger);">Act 4: Rogue Burst Ceiling</div>
+            <p class="panel-desc">
+              Agent goes rogue firing 25 calls in 2 seconds against a 20-call limit. Layer 1 pure arithmetic hard-blocks calls 21 to 25 with HTTP 429. Zero AI bypass possible.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-brand">fuse // execution</span>
+        <span>Demonstrated Failure Modes</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: Competitive Landscape -->
+    <section class="slide" id="slide-6">
+      <div class="slide-header">
+        <h2 class="slide-title">Competitive positioning</h2>
+        <span class="slide-number">06 / 10</span>
+      </div>
+      <div class="slide-body">
+        <div class="panel" style="padding: 0; overflow: hidden;">
+          <table class="table-custom">
+            <thead>
+              <tr>
+                <th>Capability</th>
+                <th>Standard Rate Limiter</th>
+                <th>Hardcoded Agent Iteration Caps</th>
+                <th>Fuse Intelligent Proxy</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="color: var(--text); font-weight: 500;">Parallel RAG Bursts</td>
+                <td style="color: var(--danger);">Blocks requests (false positive)</td>
+                <td>Consumes allowed iterations prematurely</td>
+                <td class="winner" style="color: var(--success);">Recognizes parallel intent, forwards</td>
+              </tr>
+              <tr>
+                <td style="color: var(--text); font-weight: 500;">Stuck 503 Retry Storms</td>
+                <td>Burns through budget until limit</td>
+                <td>Stops only after iteration exhausted</td>
+                <td class="winner" style="color: var(--success);">Injects backoff automatically</td>
+              </tr>
+              <tr>
+                <td style="color: var(--text); font-weight: 500;">Unmodeled Tool Loops</td>
+                <td>Cannot detect alternating tools</td>
+                <td>Blind to semantic deadlocks</td>
+                <td class="winner" style="color: var(--success);">Gemini root-cause diagnosis</td>
+              </tr>
+              <tr>
+                <td style="color: var(--text); font-weight: 500;">Failsafe Reliability</td>
+                <td>Deterministic only</td>
+                <td>No external monitoring</td>
+                <td class="winner" style="color: var(--success);">Deterministic floor overrides AI</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-brand">fuse // comparison</span>
+        <span>Differentiation</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 7: Key Metrics -->
+    <section class="slide" id="slide-7">
+      <div class="slide-header">
+        <h2 class="slide-title">Verified performance metrics</h2>
+        <span class="slide-number">07 / 10</span>
+      </div>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="panel">
+            <div class="metric-num">< 1 ms</div>
+            <div class="metric-label">Ceiling Latency</div>
+            <div class="metric-sub">Layer 1 sliding-window arithmetic runs in memory without slowing normal traffic.</div>
+          </div>
+          <div class="panel">
+            <div class="metric-num">0%</div>
+            <div class="metric-label">False-Positive Rate</div>
+            <div class="metric-sub">10 of 10 concurrent search queries allowed during legitimate parallel bursts.</div>
+          </div>
+          <div class="panel">
+            <div class="metric-num">100%</div>
+            <div class="metric-label">Storm Suppression</div>
+            <div class="metric-sub">10 of 10 repeated 503 calls throttled with automated exponential backoff.</div>
+          </div>
+          <div class="panel">
+            <div class="metric-num">~60 ms</div>
+            <div class="metric-label">Jev Classification</div>
+            <div class="metric-sub">Sub-100ms typed classification latency using TypeSafe AI System One.</div>
+          </div>
+          <div class="panel">
+            <div class="metric-num">100%</div>
+            <div class="metric-label">Hard Ceiling Catch</div>
+            <div class="metric-sub">Arithmetic ceiling catches bursts even if upstream AI providers fail completely.</div>
+          </div>
+          <div class="panel">
+            <div class="metric-num">SHA-256</div>
+            <div class="metric-label">Audit Hash Chain</div>
+            <div class="metric-sub">Every request, trip, and verdict cryptographically linked in audit.jsonl.</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-brand">fuse // metrics</span>
+        <span>Quantitative Verification</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 8: Target Awards Fit -->
+    <section class="slide" id="slide-8">
+      <div class="slide-header">
+        <h2 class="slide-title">Award alignment</h2>
+        <span class="slide-number">08 / 10</span>
+      </div>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="panel">
+            <span class="highlight-pill" style="color: var(--accent);">Primary Target</span>
+            <div class="panel-title">Thunders Engineering Excellence</div>
+            <p class="panel-desc" style="margin-bottom: 14px;">
+              Judged by Issam Allani on prototype reliability and technical execution.
+            </p>
+            <p class="panel-desc">
+              Fuse guarantees safety without depending on model uptime. When tested with 25 rapid calls, Layer 1 pure arithmetic hard-blocks calls 21 to 25. The safety floor holds even if AI APIs time out or fail.
+            </p>
+          </div>
+          <div class="panel">
+            <span class="highlight-pill" style="color: #8b5cf6; background: rgba(139, 92, 246, 0.15);">Secondary Target</span>
+            <div class="panel-title">NVIDIA Brev Breakthrough</div>
+            <p class="panel-desc" style="margin-bottom: 14px;">
+              Evaluates purposeful technical use of AI models and workflows.
+            </p>
+            <p class="panel-desc">
+              Fuse implements a deliberate two-tier AI cascade. A fast classifier handles millisecond anomaly triage, while Gemini 3.8 Flash conducts deep semantic diagnosis on escalation, outputting actionable remediations.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-brand">fuse // strategy</span>
+        <span>Hackathon Judging Criteria</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 9: Current Status & Roadmap -->
+    <section class="slide" id="slide-9">
+      <div class="slide-header">
+        <h2 class="slide-title">Status and project roadmap</h2>
+        <span class="slide-number">09 / 10</span>
+      </div>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="panel">
+            <span class="highlight-pill" style="color: var(--success); background: rgba(16, 185, 129, 0.15);">Shipped in Prototype</span>
+            <div class="panel-title">Functional & verified now</div>
+            <ul style="color: var(--text-muted); font-size: 14px; line-height: 1.7; padding-left: 18px; margin-top: 8px;">
+              <li>FastAPI reverse proxy gateway running on port 8000.</li>
+              <li>Sliding-window arithmetic counter with in-memory deques.</li>
+              <li>Jev System One integration with service profile injection.</li>
+              <li>Gemini 3.8 Flash escape hatch with automated root-cause output.</li>
+              <li>Automated 4-act scenario runner and test suite passing.</li>
+              <li>React + Tailwind developer console on port 5173.</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <span class="highlight-pill">Next Steps</span>
+            <div class="panel-title">Production readiness</div>
+            <ul style="color: var(--text-muted); font-size: 14px; line-height: 1.7; padding-left: 18px; margin-top: 8px;">
+              <li>Distributed state: Redis sliding windows for multi-proxy clusters.</li>
+              <li>Dynamic policy tuning: Learn normal agent call distributions over time.</li>
+              <li>Agent SDK: Prebuilt client hooks for LangGraph and CrewAI.</li>
+              <li>Streaming support: Token-velocity circuit breaker on SSE streams.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-brand">fuse // roadmap</span>
+        <span>Current State & Future Work</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 10: Closing Slide -->
+    <section class="slide" id="slide-10">
+      <div class="title-layout" style="align-items: center; text-align: center; justify-content: center;">
+        <div class="title-logo-row" style="justify-content: center;">
+          <img src="../frontend/public/logo.svg" alt="Fuse Logo" style="width: 80px; height: 80px;">
+          <div class="title-logo-text" style="font-size: 64px;">Fuse</div>
+        </div>
+        <div class="title-tagline" style="text-align: center; max-width: 680px;">
+          Agent velocity without the blast radius.
+        </div>
+        <div style="display: flex; gap: 24px; margin-top: 24px;">
+          <div class="panel" style="padding: 16px 28px; text-align: center;">
+            <span class="meta-label">Source Code</span>
+            <span style="font-family: var(--font-mono); font-size: 14px; color: var(--accent); margin-top: 4px; display: block;">github.com/adr1en360/Fuse</span>
+          </div>
+          <div class="panel" style="padding: 16px 28px; text-align: center;">
+            <span class="meta-label">Team Wandering</span>
+            <span style="font-size: 14px; color: var(--text); margin-top: 4px; display: block;">Adrien Oke (adrienoke@gmail.com)</span>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-brand">fuse // close</span>
+        <span>Questions & Live Demonstration</span>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Interactive Slide Controls for Presenting -->
+  <div class="slide-controls">
+    <button class="slide-btn" onclick="prevSlide()">← Prev</button>
+    <span id="counter" style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">1 / 10</span>
+    <button class="slide-btn" onclick="nextSlide()">Next →</button>
+    <button class="slide-btn" onclick="toggleFullscreen()">Fullscreen</button>
+  </div>
+
+  <script>
+    let currentSlide = 1;
+    const totalSlides = 10;
+
+    function updateCounter() {
+      document.getElementById('counter').innerText = `${currentSlide} / ${totalSlides}`;
+    }
+
+    function goToSlide(n) {
+      if (n >= 1 && n <= totalSlides) {
+        currentSlide = n;
+        const el = document.getElementById(`slide-${n}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        updateCounter();
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) goToSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) goToSlide(currentSlide - 1);
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        prevSlide();
+      } else if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
+      }
+    });
+  </script>
+</body>
+</html>

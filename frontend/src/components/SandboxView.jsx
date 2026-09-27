@@ -17,7 +17,7 @@ export default function SandboxView({ onRecordCreated }) {
       endpoint: "/v1/search?q=rag-query",
       profile: "read_intensive",
       burst: 10,
-      expected: "FORWARD (Layer 2 Jev identifies parallel_work)",
+      expected: "FORWARD: parallel fanout permitted",
     },
     {
       name: "Stuck 503 Retry Storm",
@@ -25,7 +25,7 @@ export default function SandboxView({ onRecordCreated }) {
       endpoint: "/flaky-service",
       profile: "standard_api",
       burst: 10,
-      expected: "BACKOFF (Layer 2 Jev detects retry_storm, injects delay)",
+      expected: "BACKOFF: downstream retry backoff injected",
     },
     {
       name: "Circular Tool Loop",
@@ -33,7 +33,7 @@ export default function SandboxView({ onRecordCreated }) {
       endpoint: "/loop/step-A",
       profile: "standard_api",
       burst: 8,
-      expected: "ESCALATE (Layer 2 trips escape hatch to Gemini 3.8 Flash)",
+      expected: "ESCALATE: loop diagnosed by Gemini Flash",
     },
     {
       name: "Rogue Traffic Flood",
@@ -41,7 +41,7 @@ export default function SandboxView({ onRecordCreated }) {
       endpoint: "/v1/execute",
       profile: "high_consequence",
       burst: 25,
-      expected: "BLOCK (Layer 1 Hard Ceiling stops calls 21 to 25 with 429)",
+      expected: "BLOCK: ceiling limit enforced (HTTP 429)",
     },
   ]
 
@@ -58,42 +58,54 @@ export default function SandboxView({ onRecordCreated }) {
 
     const startTime = performance.now()
     try {
-      // Fire request to local Fuse proxy gateway
-      const res = await fetch(`http://localhost:8000${endpoint}`, {
-        method,
+      // Fire request to local Fuse proxy sandbox endpoint
+      const res = await fetch("http://localhost:8000/api/sandbox/send", {
+        method: "POST",
         headers: {
-          "X-Fuse-Service": serviceProfile,
           "Content-Type": "application/json",
         },
-      })
-
-      const duration = (performance.now() - startTime).toFixed(1)
-      const data = await res.json().catch(() => ({}))
-
-      const result = {
-        status: res.status,
-        duration_ms: duration,
-        action: res.headers.get("x-fuse-action") || (res.status === 429 ? "BLOCK" : "FORWARD"),
-        layer: res.headers.get("x-fuse-layer") || "LAYER_1_OR_2",
-        backoff_sec: res.headers.get("retry-after") || null,
-        data,
-      }
-
-      setExecutionResult(result)
-      if (onRecordCreated) {
-        onRecordCreated({
-          id: "call_" + Math.random().toString(36).substring(7),
-          timestamp: new Date().toLocaleTimeString(),
-          session_id: "sandbox_session",
+        body: JSON.stringify({
           method,
           endpoint,
           service_profile: serviceProfile,
-          action: result.action,
-          layer: result.layer,
-          status_code: res.status,
-          duration_ms: parseFloat(duration),
-          reason: `Sandbox test call: ${result.action} via ${result.layer}`,
-        })
+          burst_count: burstCount,
+        }),
+      })
+
+      const totalDuration = (performance.now() - startTime).toFixed(1)
+      if (res.ok) {
+        const body = await res.json()
+        const latest = body.latest || (body.results && body.results[body.results.length - 1]) || {}
+        const items = body.results || []
+
+        const result = {
+          status: latest.status || res.status,
+          duration_ms: latest.duration_ms || parseFloat(totalDuration),
+          action: latest.action || (latest.status === 429 ? "BLOCK" : "FORWARD"),
+          layer: latest.layer || "LAYER_1_OR_2",
+          backoff_sec: latest.backoff_sec || null,
+          data: items.length > 1 ? { burst_summary: `${items.length} calls executed`, items } : latest.data,
+          items,
+        }
+
+        setExecutionResult(result)
+        if (onRecordCreated) {
+          onRecordCreated({
+            id: "call_" + Math.random().toString(36).substring(7),
+            timestamp: new Date().toLocaleTimeString(),
+            session_id: "sandbox_session",
+            method,
+            endpoint,
+            service_profile: serviceProfile,
+            action: result.action,
+            layer: result.layer,
+            status_code: result.status,
+            duration_ms: result.duration_ms,
+            reason: `Sandbox call (${burstCount}x): ${result.action} via ${result.layer}`,
+          })
+        }
+      } else {
+        throw new Error(`HTTP ${res.status}`)
       }
     } catch (err) {
       // Offline fallback simulation
@@ -129,9 +141,9 @@ export default function SandboxView({ onRecordCreated }) {
     <div className="space-y-6">
       {/* Header */}
       <div className="border-b border-slate-800 pb-4">
-        <h2 className="text-xl font-bold text-white">Interactive Request Sandbox</h2>
+        <h2 className="text-xl font-bold text-white">Request Sandbox</h2>
         <p className="text-xs text-slate-400">
-          Send test tool calls through the Fuse proxy on port 8000 and watch the 3-layer safety pipeline evaluate each request.
+          Send test requests through the proxy to observe pipeline evaluation in real time.
         </p>
       </div>
 
@@ -238,7 +250,7 @@ export default function SandboxView({ onRecordCreated }) {
             ) : (
               <>
                 <Send className="h-4 w-4" />
-                <span>Send Outbound Call via Fuse</span>
+                <span>Send Request via Fuse</span>
               </>
             )}
           </button>

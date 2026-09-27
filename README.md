@@ -162,7 +162,9 @@ During a 10-request parallel burst, Fuse evaluates the first call with Jev and a
 
 Every intercepted call is written to `audit.jsonl` using a SHA-256 hash chain:
 
-$$\text{chain\_hash}_n = \text{SHA-256}(\text{prev\_hash}_{n-1} \parallel \text{record\_json}_n)$$
+```text
+chain_hash[n] = SHA-256(prev_hash[n-1] + record_json[n])
+```
 
 Each record includes the previous record's hash, so modifying or removing an entry breaks the chain.
 
@@ -193,7 +195,7 @@ Fuse/
 ├── docs/                     # Specifications and architecture documents
 │   ├── fuse_jev_architecture.md   # System architecture and Mermaid diagrams
 │   ├── implementation_plan.md     # Implementation notes and milestones
-│   └── evaluation_metrics.md      # Hackathon rubric alignment
+│   └── evaluation_metrics.md      # Evaluation criteria and benchmarks
 ├── src/                      # Proxy source code
 │   ├── config.py             # Settings loader
 │   ├── models.py             # Data schemas (CallRecord, ServiceProfile, JevDecision)
@@ -213,14 +215,6 @@ Fuse/
     ├── test_router.py
     └── test_proxy.py
 ```
-
----
-
-## Hackathon submission
-
-Built for the GOMYCODE x NVIDIA Hackathon (September 27, 2026).
-- Primary track: Thunders Engineering Excellence Award
-- Secondary track: NVIDIA Brev Breakthrough Award
 
 ---
 

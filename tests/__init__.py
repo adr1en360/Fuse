@@ -1,0 +1,1 @@
+"""Fuse test suite."""

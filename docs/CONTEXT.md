@@ -15,6 +15,7 @@ Everything a teammate or the AI needs to understand *what we're optimizing for* 
 - `evaluation_metrics.md` — 100-point rubric + per-criterion strategy.
 - `award_strategy.md` — What Thunders and NVIDIA Brev judges actually want, and how Jev maps to it.
 - `karpathy_rules.md` — Karpathy coding guidelines applied to this build.
+- `pitch_and_demo_notes.md` : Mentor session insights, defined metrics, storyboard, and submission copy.
 
 ## What Good Output Looks Like
 A teammate can read `award_strategy.md` and know exactly which demo moment maps to which rubric criterion and which award, without opening the original onboarding page.

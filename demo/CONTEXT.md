@@ -8,6 +8,7 @@ Everything needed for submission: the 90-second demo script, presentation, video
 2. Record a backup demo (screen recording) before the final sprint ends.
 3. Fill submission fields using the templates here.
 4. Cross-check every link in an incognito window before 17:30.
+5. Maintain `submission_checklist.md`: verify all answers stay updated whenever code or demo flows change.
 
 ## Files In Here
 - `demo_script.md` — The 90-second video script, beat by beat.

@@ -1,7 +1,7 @@
-# Fuse — Intelligent Circuit Breaker for Autonomous AI Agents
+# Fuse: Circuit Breaker for Autonomous AI Agents
 
-> **Confidence-gated agent proxy powered by Jev (TypeSafe AI System One) and Gemini 3.8 Flash.**
-> Protects downstream APIs, databases, and budgets from agent retry storms, runaway loops, and cascading rate limits—without killing legitimate parallel work.
+> Confidence-gated agent proxy built with Jev (TypeSafe AI System One) and Gemini 3.8 Flash.
+> Protects downstream APIs, databases, and budgets from retry storms, runaway tool loops, and rate limit exhaustion, without stopping valid parallel work.
 
 [![Tests](https://img.shields.io/badge/tests-15%20passed-brightgreen.svg)]()
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)]()
@@ -11,59 +11,59 @@
 
 ---
 
-## What is Fuse?
+## What Fuse does
 
-When autonomous AI agents encounter tool errors, they often panic: triggering unbacked retry storms, cycling in endless tool loops, or consuming thousands of dollars in downstream API quotas. 
+When autonomous agents hit tool errors, they often retry immediately without backoff, cycle between tools in loops, or exhaust third-party API quotas.
 
-Traditional rate limiters are **dumb counters**—they can't tell the difference between an agent reading 10 documents in parallel and an agent stuck in a death loop hitting the same endpoint 10 times.
+Standard rate limiters only count requests. They cannot distinguish between an agent querying 10 documents in parallel and an agent repeating the same failed query 10 times.
 
-**Fuse sits as a transparent reverse proxy between your AI agent and outbound APIs.** It evaluates every outbound call through a strict 3-layer safety hierarchy:
+Fuse runs as a reverse proxy between your AI agent and outbound APIs. It inspects outgoing calls using three layers:
 
-1. **Layer 1: Deterministic Hard Ceiling** — Inviolable sliding-window count limits. Pure arithmetic, zero AI bypass possible.
-2. **Layer 2: Jev (TypeSafe AI System One)** — Millisecond typed classification (`Choice`, `Score`, `Noul`) with calibrated confidence, context-aware service profiling, and an `unrecognized` escape hatch.
-3. **Layer 3: Gemini 3.8 Flash Root-Cause Engine** — Invoked only when Jev triggers its escape hatch or reports low confidence, diagnosing the root cause and suggesting automated remediation.
+1. **Layer 1 (Sliding window ceiling):** A deterministic counter that blocks requests when call volume exceeds safety limits.
+2. **Layer 2 (Jev System One):** Fast typed classification returning `Choice`, `Score`, and `Noul` with confidence values and an escape hatch for unexpected patterns.
+3. **Layer 3 (Gemini 3.8 Flash):** Root-cause diagnosis invoked only when Jev flags an unclassified pattern or reports low confidence.
 
-Every event is recorded to a **cryptographically hashed, tamper-evident audit log** (`audit.jsonl`).
+Every event is written to a SHA-256 chained audit log (`audit.jsonl`).
 
 ---
 
-## Why Fuse?
+## Behavior comparison
 
-| Scenario | Traditional Rate Limiter | Fuse Intelligent Proxy |
+| Scenario | Standard rate limiter | Fuse proxy |
 |:---|:---|:---|
-| **Parallel RAG Burst** (10 docs at once) | ❌ **Trips static limit** and crashes the agent turn | ✅ **Jev recognizes `parallel_work`** $\to$ Forwarded instantly |
-| **Failing Endpoint Retry Storm** (10 identical calls) | ❌ Burns API budget or gets your API key banned | ✅ **Jev detects `retry_storm`** $\to$ Injects exponential backoff |
-| **Cyclic Loop Bug** (Alternating tools, no progress) | ❌ Runs forever until token limits exhaust | ⚡ **Jev triggers `unrecognized` escape** $\to$ **Gemini 3.8 Flash** diagnoses loop root cause |
-| **Catastrophic Rogue Burst** (25 rapid calls) | ❌ Unpredictable behavior | 🔴 **Layer 1 Hard Ceiling enforces 429 block** deterministically |
+| Parallel burst (10 concurrent reads) | Blocks requests and breaks agent flow | Jev identifies parallel work and forwards calls |
+| Failing endpoint retry storm (10 identical calls) | Consumes budget or gets credentials blocked | Jev flags retry storm and applies backoff |
+| Cyclic tool loop (alternating tools, no progress) | Runs until agent token limit is reached | Jev triggers escape hatch, Gemini diagnoses the loop |
+| Rogue traffic burst (25 rapid calls) | May permit excess calls depending on window | Layer 1 hard limit returns 429 after 20 calls |
 
 ---
 
-## System Architecture
+## Architecture
 
 ```mermaid
 graph LR
-    AGENT["🤖 Autonomous Agent"] -->|"All outbound tool calls"| PROXY["🛡️ Fuse Proxy (:8000)"]
-    PROXY -->|"Normal traffic"| TARGET["🌐 Downstream APIs (:9000)"]
-    PROXY -->|"Velocity spike"| JEV["⚡ Jev System One<br/>Choice / Score / Noul"]
+    AGENT["Autonomous Agent"] -->|"Outbound tool calls"| PROXY["Fuse Proxy (:8000)"]
+    PROXY -->|"Normal traffic"| TARGET["Downstream APIs (:9000)"]
+    PROXY -->|"Velocity spike"| JEV["Jev System One<br/>Choice, Score, Noul"]
     JEV -->|"Typed decision + confidence"| PROXY
-    PROXY -.->|"Escape hatch OR Low confidence"| GEMINI["🧠 Gemini 3.8 Flash<br/>Deep Root-Cause Doctor"]
+    PROXY -.->|"Escape hatch or low confidence"| GEMINI["Gemini 3.8 Flash<br/>Root-cause diagnosis"]
     GEMINI -.->|"Remediation verdict"| PROXY
-    PROXY -->|"Real-time metrics"| DASH["📊 Rich Live Dashboard"]
-    PROXY -->|"SHA-256 chain log"| AUDIT["🔐 audit.jsonl"]
+    PROXY -->|"Live metrics"| DASH["Terminal Dashboard"]
+    PROXY -->|"SHA-256 chain log"| AUDIT["audit.jsonl"]
 ```
 
 ---
 
 ## Installation
 
-Ensure you have Python 3.12+ and [`uv`](https://docs.astral.sh/uv/) installed:
+Requirements: Python 3.12 or newer and uv.
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/your-org/Fuse.git
 cd Fuse
 
-# 2. Create virtual environment with uv
+# 2. Create virtual environment
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
@@ -75,146 +75,140 @@ uv pip install typesafe-sdk google-genai fastapi uvicorn httpx rich pydantic pyt
 
 ## Quickstart
 
-Run the complete 4-act live demonstration in three easy steps:
+Run the 4-act demonstration in three steps:
 
-### Step 1: Configure Environment
+### 1. Set environment variables
 
-Copy the example template and supply your API keys:
+Copy `.env.example` to `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env`:
-```env
-# TypeSafe AI Key (for Layer 2 Jev)
-TYPESAFE_API_KEY=your_typesafe_key
+Update `.env` with your API keys:
 
-# Gemini API Key (for Layer 3 Gemini 3.8 Flash)
+```env
+TYPESAFE_API_KEY=your_typesafe_key
 GEMINI_API_KEY=your_gemini_key
 GEMINI_MODEL=gemini-3.8-flash
-
-# Proxy & Downstream Target Ports
 PROXY_PORT=8000
 TARGET_BASE_URL=http://localhost:9000
 ```
 
-### Step 2: Start Mock Target Service & Fuse Proxy
+### 2. Start mock server and proxy
 
-In terminal 1, start the mock downstream service:
+Terminal 1:
 ```bash
 python demo/mock_server.py
 ```
 
-In terminal 2, launch the Fuse proxy gateway:
+Terminal 2:
 ```bash
 python -m uvicorn src.proxy:app --port 8000
 ```
 
-### Step 3: Run the 4-Act Live Demonstration
+### 3. Run the demo script
 
-In terminal 3, run the automated scenario runner:
+Terminal 3:
 ```bash
 python demo/run_demo.py
 ```
 
-You will see the live terminal dashboard intercepting the traffic in real time:
-- **Act 1:** 10 parallel search requests forwarded without false-positive blocking.
-- **Act 2:** 10 identical retry calls mitigated with automated exponential backoff.
-- **Act 3:** Loop bug detected $\to$ Jev escapes to Gemini 3.8 Flash $\to$ Circuit tripped with remediation advice.
-- **Act 4:** Rogue burst hits Layer 1 Hard Ceiling $\to$ Pure arithmetic blocks calls 21–25 with `429 Too Many Requests`.
+The terminal dashboard shows each intercepted scenario:
+- Act 1: 10 parallel search requests forwarded without blocking.
+- Act 2: 10 repeated error calls throttled with exponential backoff.
+- Act 3: Tool loop detected, routed to Gemini 3.8 Flash, circuit opened with repair advice.
+- Act 4: Rogue burst blocked by Layer 1 counter once call count hits 20.
 
 ---
 
-## Configuration Reference
+## Configuration
 
-Key thresholds are configurable in [`.env`](.env) without modifying code:
+Settings are configured through `.env`:
 
-| Setting | Default | Description |
+| Variable | Default | Description |
 |:---|:---|:---|
-| `HARD_CEILING_CALLS` | `20` | Max calls allowed within window before Layer 1 hard blocks |
-| `HARD_CEILING_WINDOW_SECONDS` | `10` | Time window for Layer 1 deterministic rate evaluation |
-| `ANOMALY_THRESHOLD_CALLS` | `8` | Call rate spike that trips Layer 2 Jev evaluation |
-| `ANOMALY_THRESHOLD_WINDOW_SECONDS` | `5` | Time window for velocity anomaly detection |
-| `CONFIDENCE_HIGH` | `0.7` | Jev confidence threshold required to act directly without Layer 3 escalation |
-| `CONFIDENCE_LOW` | `0.4` | Lower confidence bound below which LLM intervention is mandatory |
-| `SEVERITY_DANGEROUS` | `1.5` | Score threshold triggering immediate human-in-the-loop escalation |
+| `HARD_CEILING_CALLS` | `20` | Maximum calls allowed in the ceiling window before blocking |
+| `HARD_CEILING_WINDOW_SECONDS` | `10` | Evaluation window in seconds for the Layer 1 hard ceiling |
+| `ANOMALY_THRESHOLD_CALLS` | `8` | Call count within velocity window that triggers Jev evaluation |
+| `ANOMALY_THRESHOLD_WINDOW_SECONDS` | `5` | Time window in seconds for velocity anomaly detection |
+| `CONFIDENCE_HIGH` | `0.7` | Minimum Jev confidence to act without consulting Layer 3 |
+| `CONFIDENCE_LOW` | `0.4` | Lower confidence limit that requires Layer 3 analysis |
+| `SEVERITY_DANGEROUS` | `1.5` | Risk score threshold that triggers escalation |
 
 ---
 
-## Context-Aware Service Profiles
+## Service profiles
 
-Fuse injects downstream service characteristics into Jev's `state` to ensure accurate risk classification:
+Fuse includes downstream service context in Jev state evaluations:
 
-- **`read_intensive`** (Search, Vector DBs): High concurrency tolerance; benign parallel bursts are allowed.
-- **`standard_api`** (Default REST): Balanced thresholding; standard backoff on repeated 5xx/429 errors.
-- **`high_consequence`** (Billing, Payments, SMS, Mutating APIs): Zero tolerance for unchecked retries; immediate backoff and safety alerts.
+- `read_intensive` (search, vector databases): higher concurrency allowance for benign read bursts.
+- `standard_api` (general REST endpoints): standard backoff rules on repeated 5xx or 429 status codes.
+- `high_consequence` (billing, database updates, messaging): immediate backoff on errors to avoid unwanted side effects.
 
-*Agents can pass an optional header `X-Fuse-Service: payments`, or Fuse automatically infers the profile from HTTP methods (`GET` vs `POST`/`DELETE`) and URL patterns.*
-
----
-
-## Quota-Protective Burst Caching
-
-To prevent autonomous agents from burning through model API credits during rapid bursts, Fuse deploys an **in-flight session decision cache**:
-- When 10 concurrent requests arrive in Act 1, Fuse queries Jev **once**.
-- The decision is cached for 3 seconds across the burst.
-- Subsequent calls reuse the verdict with **zero additional API calls**.
-- The entire 4-act demo executes with **~3 Jev calls** and **1 Gemini call** total.
+Agents can specify a profile using the `X-Fuse-Service` header. If absent, Fuse infers the profile from HTTP methods and URL paths.
 
 ---
 
-## Cryptographic Tamper-Evident Audit Trail
+## Burst caching
 
-Every intercepted decision is appended to [`audit.jsonl`](audit.jsonl) with SHA-256 chain hashing:
+To conserve API calls during sudden spikes, Fuse caches Jev decisions for 3 seconds per service profile.
+
+During a 10-request parallel burst, Fuse evaluates the first call with Jev and applies the cached decision to the remaining 9 calls. The complete 4-act demo runs with 3 Jev calls and 1 Gemini call.
+
+---
+
+## Audit logging
+
+Every intercepted call is written to `audit.jsonl` using a SHA-256 hash chain:
 
 $$\text{chain\_hash}_n = \text{SHA-256}(\text{prev\_hash}_{n-1} \parallel \text{record\_json}_n)$$
 
-This guarantees mathematical proof of non-tampering for compliance, engineering audits, and responsible AI evaluation.
+Each record includes the previous record's hash, so modifying or removing an entry breaks the chain.
 
 ---
 
-## Development & Testing
+## Testing
 
-Run the full automated test suite:
+Run the test suite:
 
 ```bash
 pytest tests/ -v
 ```
 
-Test coverage includes:
-- `tests/test_sliding_window.py` — Deterministic sliding window & hard ceiling limits.
-- `tests/test_router.py` — Decision matrix, confidence gating, and escape hatch logic.
-- `tests/test_proxy.py` — End-to-end FastAPI proxy forwarding, backoff injection, and 429 enforcement.
+The 15 automated tests verify:
+- `tests/test_sliding_window.py`: Sliding window counters and ceiling enforcement.
+- `tests/test_router.py`: Decision routing, confidence gating, and escape hatch handling.
+- `tests/test_proxy.py`: Proxy forwarding, backoff injection, and 429 responses.
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
 Fuse/
 ├── .env.example              # Configuration template
 ├── README.md                 # Project documentation
-├── pyproject.toml            # uv project metadata
-├── docs/                     # Architectural specs & hackathon rubrics
-│   ├── fuse_jev_architecture.md   # Complete visual architecture (8 Mermaid diagrams)
-│   ├── implementation_plan.md     # Engineering roadmap & milestones
-│   └── evaluation_metrics.md      # Award alignment & rubric criteria
-├── src/                      # Core Fuse proxy implementation
-│   ├── config.py             # Settings loader via pydantic & dotenv
-│   ├── models.py             # Pydantic schemas (CallRecord, ServiceProfile, JevDecision)
-│   ├── sliding_window.py     # Layer 1 deterministic counter & rate tracker
-│   ├── jev_client.py         # Layer 2 TypeSafe SDK wrapper (Choice, Score, Noul)
-│   ├── llm_client.py         # Layer 3 Gemini 3.8 Flash root-cause client
-│   ├── router.py             # Confidence-gated routing engine with escape hatch
+├── pyproject.toml            # Project dependencies and settings
+├── docs/                     # Specifications and architecture documents
+│   ├── fuse_jev_architecture.md   # System architecture and Mermaid diagrams
+│   ├── implementation_plan.md     # Implementation notes and milestones
+│   └── evaluation_metrics.md      # Hackathon rubric alignment
+├── src/                      # Proxy source code
+│   ├── config.py             # Settings loader
+│   ├── models.py             # Data schemas (CallRecord, ServiceProfile, JevDecision)
+│   ├── sliding_window.py     # Layer 1 counter and rate tracking
+│   ├── jev_client.py         # Layer 2 TypeSafe Jev client
+│   ├── llm_client.py         # Layer 3 Gemini 3.8 Flash client
+│   ├── router.py             # Decision router and confidence checks
 │   ├── proxy.py              # FastAPI reverse proxy gateway
-│   ├── dashboard.py          # Rich live console & SHA-256 audit logger
-│   └── simulator.py          # 4-act synthetic agent traffic generator
-├── demo/                     # Live demo harness & submission assets
-│   ├── mock_server.py        # Port 9000 downstream target simulator
-│   ├── run_demo.py           # Automated 4-act scenario runner
-│   └── demo_script.md        # 90-second video voiceover teleprompter script
-└── tests/                    # Automated unit & integration tests
+│   ├── dashboard.py          # Terminal metrics and audit logging
+│   └── simulator.py          # Demo traffic generator
+├── demo/                     # Demo scripts and downstream mock
+│   ├── mock_server.py        # Local mock API on port 9000
+│   ├── run_demo.py           # Demo runner for Acts 1 through 4
+│   └── demo_script.md        # Video demonstration script
+└── tests/                    # Automated test suite
     ├── test_sliding_window.py
     ├── test_router.py
     └── test_proxy.py
@@ -222,11 +216,11 @@ Fuse/
 
 ---
 
-## Hackathon Submission
+## Hackathon submission
 
-Built for the **GOMYCODE × NVIDIA "Come Build with AI" Hackathon** (27 September 2026):
-- 🏆 **Primary Target:** Thunders Engineering Excellence Award (Mac Mini)
-- ⚡ **Secondary Target:** NVIDIA Brev Breakthrough Award (Responsible AI / Innovation)
+Built for the GOMYCODE x NVIDIA Hackathon (September 27, 2026).
+- Primary track: Thunders Engineering Excellence Award
+- Secondary track: NVIDIA Brev Breakthrough Award
 
 ---
 

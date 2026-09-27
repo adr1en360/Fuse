@@ -1,0 +1,46 @@
+# Environment variables (contains API keys)
+.env
+
+# Reference materials (not for public repo)
+Jev, PRD + Battle Plan.html
+hackathon-gomycode-com-onboarding.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Distribution
+*.tar.gz
+*.whl

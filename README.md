@@ -1,13 +1,24 @@
-# Fuse: Circuit Breaker for Autonomous AI Agents
+<p align="center">
+  <img src="logo.svg" alt="Fuse Logo" width="140" />
+</p>
 
-> Confidence-gated agent proxy built with Jev (TypeSafe AI System One) and Gemini 3.8 Flash.
-> Protects downstream APIs, databases, and budgets from retry storms, runaway tool loops, and rate limit exhaustion, without stopping valid parallel work.
+# Fuse
 
-[![Tests](https://img.shields.io/badge/tests-15%20passed-brightgreen.svg)]()
-[![Python](https://img.shields.io/badge/python-3.12-blue.svg)]()
-[![TypeSafe](https://img.shields.io/badge/System%20One-Jev-E551BA.svg)](https://typesafe.ai)
-[![LLM](https://img.shields.io/badge/Layer%203-Gemini%203.8%20Flash-4285F4.svg)]()
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+<p align="center">
+  <strong style="font-size: 1.25rem;"><span style="color: #74cfd8;">Agent Circuit Breaker &amp; Gateway</span></strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/adr1en360/Fuse"><img src="https://img.shields.io/badge/Tagline-Agent%20Circuit%20Breaker%20%26%20Gateway-74cfd8?labelColor=05080e" alt="Agent Circuit Breaker & Gateway" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-15%20passed-74cfd8?labelColor=05080e" alt="Tests" /></a>
+  <img src="https://img.shields.io/badge/Python-3.12-74cfd8?labelColor=05080e" alt="Python" />
+  <a href="https://typesafe.ai"><img src="https://img.shields.io/badge/System%20One-Jev-E551BA?labelColor=05080e" alt="TypeSafe" /></a>
+  <img src="https://img.shields.io/badge/Layer%203-Gemini%203.8%20Flash-4285F4?labelColor=05080e" alt="LLM" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-74cfd8?labelColor=05080e" alt="License" /></a>
+</p>
+
+Confidence-gated reverse proxy built with Jev (TypeSafe AI System One) and Gemini 3.8 Flash.
+Protects downstream APIs, databases, and budgets from retry storms, runaway tool loops, and rate limit exhaustion, without stopping valid parallel work.
 
 ---
 
@@ -191,11 +202,14 @@ The 15 automated tests verify:
 Fuse/
 ├── .env.example              # Configuration template
 ├── README.md                 # Project documentation
+├── logo.svg                  # Brand vector mark
 ├── pyproject.toml            # Project dependencies and settings
 ├── docs/                     # Specifications and architecture documents
 │   ├── fuse_jev_architecture.md   # System architecture and Mermaid diagrams
 │   ├── implementation_plan.md     # Implementation notes and milestones
-│   └── evaluation_metrics.md      # Evaluation criteria and benchmarks
+│   ├── evaluation_metrics.md      # Evaluation criteria and benchmarks
+│   └── slides.html           # Presentation slide deck
+├── frontend/                 # React and Tailwind web console
 ├── src/                      # Proxy source code
 │   ├── config.py             # Settings loader
 │   ├── models.py             # Data schemas (CallRecord, ServiceProfile, JevDecision)

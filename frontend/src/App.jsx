@@ -13,38 +13,50 @@ export default function App() {
   const [traces, setTraces] = useState(initialDecisionTraces)
   const [activeState, setActiveState] = useState("green")
   const [isConnected, setIsConnected] = useState(true)
+  const [isRunningScenario, setIsRunningScenario] = useState(false)
 
-  // Polling for live proxy metrics if proxy is running on :8000
+  // Polling for live proxy metrics and decision traces
   useEffect(() => {
     let isMounted = true
 
-    const fetchLiveMetrics = async () => {
+    const fetchLiveData = async () => {
       try {
-        const res = await fetch("http://localhost:8000/metrics")
-        if (res.ok && isMounted) {
-          const data = await res.json()
-          if (data && data.stats) {
-            setStats((prev) => ({
-              ...prev,
-              total_calls: data.stats.total_calls || prev.total_calls,
-              forwarded: data.stats.forwarded || prev.forwarded,
-              backoff_applied: data.stats.backoff_applied || prev.backoff_applied,
-              blocked: data.stats.blocked || prev.blocked,
-              escaped_to_llm: data.stats.escaped_to_llm || prev.escaped_to_llm,
-              layer1_trips: data.stats.layer1_trips || prev.layer1_trips,
-              layer2_jev_trips: data.stats.layer2_jev_trips || prev.layer2_jev_trips,
-              layer3_gemini_trips: data.stats.layer3_gemini_trips || prev.layer3_gemini_trips,
-            }))
+        const [metricsRes, tracesRes] = await Promise.allSettled([
+          fetch("http://localhost:8000/api/metrics"),
+          fetch("http://localhost:8000/api/traces?limit=50"),
+        ])
+
+        if (metricsRes.status === "fulfilled" && metricsRes.value.ok && isMounted) {
+          const data = await metricsRes.value.json()
+          const s = data.stats || data
+          if (s) {
+            setStats({
+              total_calls: s.total_calls ?? 0,
+              forwarded: s.forwarded ?? 0,
+              backoff_applied: s.backoff_applied ?? 0,
+              blocked: s.blocked ?? 0,
+              escaped_to_llm: s.escaped_to_llm ?? 0,
+              layer1_trips: s.layer1_trips ?? 0,
+              layer2_jev_trips: s.layer2_jev_trips ?? 0,
+              layer3_gemini_trips: s.layer3_gemini_trips ?? 0,
+            })
             setIsConnected(true)
           }
         }
+
+        if (tracesRes.status === "fulfilled" && tracesRes.value.ok && isMounted) {
+          const liveTraces = await tracesRes.value.json()
+          if (Array.isArray(liveTraces) && liveTraces.length > 0) {
+            setTraces(liveTraces)
+          }
+        }
       } catch (err) {
-        // Fallback to local state if proxy is offline
+        if (isMounted) setIsConnected(false)
       }
     }
 
-    fetchLiveMetrics()
-    const interval = setInterval(fetchLiveMetrics, 2000)
+    fetchLiveData()
+    const interval = setInterval(fetchLiveData, 1000)
     return () => {
       isMounted = false
       clearInterval(interval)
@@ -63,8 +75,7 @@ export default function App() {
     }))
   }
 
-  const handleRunScenario = (sc) => {
-    setActiveState(sc.id)
+  const fallbackSimulate = (sc) => {
     const newRecord = {
       id: "sc_" + Math.random().toString(36).substring(7),
       timestamp: new Date().toLocaleTimeString(),
@@ -83,6 +94,54 @@ export default function App() {
     handleRecordCreated(newRecord)
   }
 
+  const handleRunScenario = async (sc) => {
+    setActiveState(sc.id)
+    setIsRunningScenario(true)
+
+    try {
+      const res = await fetch("http://localhost:8000/api/scenarios/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scenario_id: sc.id }),
+      })
+
+      if (res.ok) {
+        const [tracesRes, metricsRes] = await Promise.all([
+          fetch("http://localhost:8000/api/traces?limit=50"),
+          fetch("http://localhost:8000/api/metrics"),
+        ])
+        if (tracesRes.ok) {
+          const newTraces = await tracesRes.json()
+          if (Array.isArray(newTraces) && newTraces.length > 0) {
+            setTraces(newTraces)
+          }
+        }
+        if (metricsRes.ok) {
+          const data = await metricsRes.json()
+          const s = data.stats || data
+          if (s) {
+            setStats({
+              total_calls: s.total_calls ?? 0,
+              forwarded: s.forwarded ?? 0,
+              backoff_applied: s.backoff_applied ?? 0,
+              blocked: s.blocked ?? 0,
+              escaped_to_llm: s.escaped_to_llm ?? 0,
+              layer1_trips: s.layer1_trips ?? 0,
+              layer2_jev_trips: s.layer2_jev_trips ?? 0,
+              layer3_gemini_trips: s.layer3_gemini_trips ?? 0,
+            })
+          }
+        }
+      } else {
+        fallbackSimulate(sc)
+      }
+    } catch (err) {
+      fallbackSimulate(sc)
+    } finally {
+      setIsRunningScenario(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans">
       <Navbar
@@ -99,6 +158,7 @@ export default function App() {
             activeState={activeState}
             setActiveState={setActiveState}
             onRunScenario={handleRunScenario}
+            isRunningScenario={isRunningScenario}
           />
         )}
 

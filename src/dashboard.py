@@ -105,13 +105,14 @@ class FuseDashboard:
     def _append_to_audit_log(self, record: AuditRecord) -> None:
         """Appends record with SHA-256 chain hash for tamper-evident logging."""
         record_json = record.model_dump_json()
-        combined = f"{self._last_log_hash}|{record_json}".encode()
+        prev_hash = self._last_log_hash
+        combined = f"{prev_hash}|{record_json}".encode()
         current_hash = hashlib.sha256(combined).hexdigest()
         self._last_log_hash = current_hash
 
         entry = {
             "record": json.loads(record_json),
-            "prev_hash": self._last_log_hash,
+            "prev_hash": prev_hash,
             "chain_hash": current_hash,
         }
 

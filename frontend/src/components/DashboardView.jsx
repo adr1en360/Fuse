@@ -14,7 +14,7 @@ import {
 } from "lucide-react"
 import PipelineVisualizer from "./PipelineVisualizer"
 
-export default function DashboardView({ stats, traces, activeState, setActiveState, onRunScenario }) {
+export default function DashboardView({ stats, traces, activeState, setActiveState, onRunScenario, isRunningScenario }) {
   const [selectedTrace, setSelectedTrace] = useState(null)
   const [filterAction, setFilterAction] = useState("ALL")
   const [searchQuery, setSearchQuery] = useState("")
@@ -27,7 +27,7 @@ export default function DashboardView({ stats, traces, activeState, setActiveSta
       target: "/v1/search?q=rag-query",
       expectedAction: "FORWARD",
       layer: "LAYER_2_JEV_SYSTEM_ONE",
-      description: "10 parallel queries. Jev identifies parallel work and passes calls with zero false-positive blocks.",
+      description: "10 parallel queries. Jev detects fanout and forwards calls without false-positive blocks.",
     },
     {
       id: "yellow",
@@ -36,7 +36,7 @@ export default function DashboardView({ stats, traces, activeState, setActiveSta
       target: "/flaky-service",
       expectedAction: "BACKOFF",
       layer: "LAYER_2_JEV_SYSTEM_ONE",
-      description: "Downstream 503 errors. Jev detects retry storm and injects exponential backoff delay.",
+      description: "Repeated 503 errors. Jev detects retry storm and injects exponential backoff.",
     },
     {
       id: "blue",
@@ -45,7 +45,7 @@ export default function DashboardView({ stats, traces, activeState, setActiveSta
       target: "/loop/cyclical",
       expectedAction: "ESCALATE_LLM",
       layer: "LAYER_3_GEMINI_FLASH",
-      description: "Cyclic tool loop. Jev trips escape hatch; Gemini 3.8 Flash diagnoses root cause.",
+      description: "Cyclic tool loop. Jev routes low-confidence anomaly to Gemini Flash for diagnosis.",
     },
     {
       id: "red",
@@ -54,7 +54,7 @@ export default function DashboardView({ stats, traces, activeState, setActiveSta
       target: "/v1/execute",
       expectedAction: "BLOCK",
       layer: "LAYER_1_HARD_CEILING",
-      description: "25 rapid calls. Layer 1 deterministic arithmetic ceiling hard-blocks calls 21 to 25 with 429.",
+      description: "25 rapid calls. Layer 1 hard ceiling blocks calls 21 to 25 with HTTP 429.",
     },
   ]
 
@@ -94,17 +94,17 @@ export default function DashboardView({ stats, traces, activeState, setActiveSta
   return (
     <div className="space-y-5">
       {/* 1. Distilled Scenario Toolbar */}
-      <div className="rounded-xl border border-slate-800/80 bg-slate-900/30 p-3">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="rounded-xl border border-slate-800/80 bg-slate-900/30 p-2.5 sm:p-3">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-2.5">
           {/* Act Pills */}
-          <div className="flex items-center space-x-1.5 overflow-x-auto">
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
             {scenarios.map((sc) => {
               const isSelected = activeState === sc.id
               return (
                 <button
                   key={sc.id}
                   onClick={() => handleRun(sc)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-mono transition-all whitespace-nowrap ${
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
                     isSelected
                       ? "bg-[#74cfd8] text-[#05080e] font-bold shadow-sm"
                       : "bg-slate-950 text-slate-400 border border-slate-800 hover:text-white hover:bg-slate-900"
@@ -118,8 +118,13 @@ export default function DashboardView({ stats, traces, activeState, setActiveSta
           </div>
 
           {/* Quick Act Description */}
-          <div className="text-xs text-slate-400 flex items-center space-x-2">
-            <span className="hidden lg:inline text-slate-500">Active Test:</span>
+          <div className="text-xs text-slate-400 flex items-center space-x-2 min-w-0">
+            {isRunningScenario && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#74cfd8]/20 text-[#74cfd8] animate-pulse shrink-0">
+                EXECUTING...
+              </span>
+            )}
+            <span className="text-slate-500 font-mono text-[11px] uppercase tracking-wider shrink-0">Active Test:</span>
             <span className="text-slate-300 truncate">{activeScenario.description}</span>
           </div>
         </div>
@@ -127,8 +132,8 @@ export default function DashboardView({ stats, traces, activeState, setActiveSta
 
       {/* 2. Sleek Pipeline Visualizer */}
       <PipelineVisualizer
-        activeLayer={selectedTrace?.layer || activeScenario.layer}
-        activeAction={selectedTrace?.action || activeScenario.expectedAction}
+        activeLayer={selectedTrace?.layer || traces[0]?.layer || activeScenario.layer}
+        activeAction={selectedTrace?.action || traces[0]?.action || activeScenario.expectedAction}
       />
 
       {/* 3. Quiet Operational Metrics Strip */}
@@ -283,7 +288,7 @@ export default function DashboardView({ stats, traces, activeState, setActiveSta
 
           {selectedTrace.chain_hash && (
             <div className="rounded bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-400 border border-slate-800 flex items-center justify-between">
-              <span className="text-slate-500">SHA-256 Audit Hash:</span>
+              <span className="text-slate-500">Audit Hash:</span>
               <span className="text-emerald-400 truncate ml-2">{selectedTrace.chain_hash}</span>
             </div>
           )}
